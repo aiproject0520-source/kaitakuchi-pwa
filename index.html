@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d1814">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="灰の開拓地">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; touch-action: manipulation; overscroll-behavior-y: none; }
+</style>
+<title>灰の開拓地</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* Layout: one handheld column — settlement scene on top, resources and raid watch, then tabbed work/build/log; fixed tab bar. Deliberately single dark theme (dusk on a dry plain). */
+:root {
+  color-scheme: dark;
+  --ink: #1d1814;
+  --panel: #29221c;
+  --panel-2: #342b23;
+  --line: #4a3d31;
+  --sand: #ecdcbc;
+  --dim: #a8977c;
+  --rust: #d9703a;
+  --rust-ink: #2a1206;
+  --food: #a3c45e;
+  --wood: #c99052;
+  --stone: #b4b8bf;
+  --iron: #82b6cf;
+  --danger: #e0564a;
+  --safe: #8cc06c;
+  --pixel: "DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", monospace;
+  --body: "BIZ UDPGothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--ink); color: var(--sand);
+  font-family: var(--body); font-size: 15px; line-height: 1.5;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+}
+.app {
+  max-width: 480px; margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 12px calc(84px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.px { font-family: var(--pixel); font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.top h1 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 22px; line-height: 1.2; }
+.top .when { font-family: var(--pixel); color: var(--dim); font-size: 13px; letter-spacing: .05em; }
+.top .pop { text-align: right; }
+.top .pop small { display: block; font-size: 11px; color: var(--dim); letter-spacing: .08em; }
+.top .pop b { font-family: var(--pixel); font-weight: 400; font-size: 20px; }
+
+.scene { position: relative; border: 2px solid var(--line); border-radius: 4px; overflow: hidden; background: #c9a46a; }
+.scene canvas { display: block; width: 100%; height: auto; aspect-ratio: 160 / 110; image-rendering: crisp-edges; image-rendering: pixelated; }
+.banner {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  font-family: var(--pixel); font-size: 22px; padding: 6px 14px; border-radius: 3px;
+  background: rgba(29,24,20,.85); border: 1px solid var(--line); white-space: nowrap; pointer-events: none;
+}
+.banner.win { color: var(--safe); border-color: var(--safe); }
+.banner.lose { color: var(--danger); border-color: var(--danger); }
+
+.res { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.res div { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; min-width: 0; }
+.res small { display: block; font-size: 11px; color: var(--dim); }
+.res b { display: block; font-family: var(--pixel); font-weight: 400; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.res i { display: block; font-style: normal; font-family: var(--pixel); font-size: 11px; color: var(--dim); }
+.res i.neg { color: var(--danger); }
+.res .cap { height: 3px; background: var(--ink); margin-top: 4px; border-radius: 2px; overflow: hidden; }
+.res .cap span { display: block; height: 100%; }
+.r-food b { color: var(--food); } .r-food .cap span { background: var(--food); }
+.r-wood b { color: var(--wood); } .r-wood .cap span { background: var(--wood); }
+.r-stone b { color: var(--stone); } .r-stone .cap span { background: var(--stone); }
+.r-iron b { color: var(--iron); } .r-iron .cap span { background: var(--iron); }
+
+.watch { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.watch .line1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+.chip { font-family: var(--pixel); font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid currentColor; }
+.chip.safe { color: var(--safe); }
+.chip.danger { color: var(--danger); }
+.vsbar { position: relative; height: 10px; background: var(--ink); border-radius: 2px; overflow: hidden; }
+.vsbar .d { position: absolute; left: 0; top: 0; bottom: 0; background: var(--safe); }
+.vsbar .p { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--danger); }
+.watch .line2 { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); gap: 8px; }
+.watch .line2 b { font-family: var(--pixel); font-weight: 400; color: var(--sand); font-size: 14px; margin-left: 4px; }
+
+.panel { display: flex; flex-direction: column; gap: 8px; }
+.panel h2 { margin: 4px 0 0; font-family: var(--pixel); font-weight: 400; font-size: 15px; color: var(--dim); letter-spacing: .1em; }
+.hint { margin: 0; font-size: 12px; color: var(--dim); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.row .t strong { font-size: 15px; }
+.row .t .lv { font-family: var(--pixel); color: var(--dim); font-size: 13px; margin-left: 6px; }
+.row .t p { margin: 1px 0 0; font-size: 12px; color: var(--dim); }
+.row .dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 1px; vertical-align: 1px; }
+.row.off { opacity: .55; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper button { width: 38px; height: 38px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); font-family: var(--pixel); font-size: 20px; line-height: 1; }
+.stepper button:disabled { opacity: .35; cursor: default; }
+.stepper span { min-width: 30px; text-align: center; font-family: var(--pixel); font-size: 18px; }
+.costs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 3px; font-family: var(--pixel); font-size: 12px; }
+.costs .short { color: var(--danger); }
+.mk { min-width: 76px; padding: 9px 10px; border-radius: 4px; font-family: var(--pixel); font-size: 15px; background: var(--rust); color: var(--rust-ink); box-shadow: 0 3px 0 #8a3d18; }
+.mk:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #8a3d18; }
+.mk:disabled { background: var(--panel-2); color: var(--dim); box-shadow: 0 3px 0 var(--line); cursor: default; }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 13px; }
+.log li { padding: 5px 0; border-bottom: 1px solid var(--panel-2); color: var(--dim); overflow-wrap: anywhere; }
+.log li .d { font-family: var(--pixel); margin-right: 6px; color: var(--dim); }
+.log li.win { color: var(--safe); } .log li.lose { color: var(--danger); } .log li.join { color: var(--sand); }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--dim); }
+.stats b { font-family: var(--pixel); font-weight: 400; color: var(--sand); font-size: 15px; margin-left: 4px; }
+
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 16px calc(6px + env(safe-area-inset-bottom, 0px)); }
+.tabs div { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tabs button { padding: 10px 4px; border-radius: 4px; font-family: var(--pixel); font-size: 16px; color: var(--dim); position: relative; }
+.tabs button[aria-selected="true"] { color: var(--rust); background: var(--ink); }
+.tabs .dot { position: absolute; top: 6px; right: calc(50% - 32px); width: 7px; height: 7px; border-radius: 50%; background: var(--rust); }
+
+.veil { position: fixed; inset: 0; z-index: 10; background: rgba(12,10,8,.8); display: grid; place-items: center; padding: 16px; }
+.card { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--rust); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 20px; color: var(--rust); }
+.card dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14px; }
+.card dt { color: var(--dim); } .card dd { margin: 0; font-family: var(--pixel); font-size: 16px; text-align: right; }
+.card .ok { padding: 11px; border-radius: 4px; background: var(--rust); color: var(--rust-ink); font-family: var(--pixel); font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .mk:active { transform: none; } }
+</style>
+
+
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div>
+      <div class="when" id="when">1日目 昼</div>
+      <h1>灰の開拓地</h1>
+    </div>
+    <div class="pop"><small>住人</small><b id="pop">3 / 4</b></div>
+  </header>
+
+  <div class="scene">
+    <canvas id="cv" width="160" height="110" aria-label="集落のようす"></canvas>
+    <div class="banner" id="banner" hidden></div>
+  </div>
+
+  <div class="res" id="res"></div>
+
+  <section class="watch" aria-label="盗賊の見張り">
+    <div class="line1"><span id="raidWhen">次の襲撃まで…</span><span class="chip safe" id="raidChip">安全</span></div>
+    <div class="vsbar"><span class="d" id="vsD"></span><span class="p" id="vsP"></span></div>
+    <div class="line2"><span>守り<b id="defv">0</b></span><span>盗賊の戦力<b id="powv">0</b></span></div>
+  </section>
+
+  <section class="panel" id="tab-work">
+    <h2>仕事の割り振り</h2>
+    <p class="hint" id="idleHint"></p>
+    <div id="jobs"></div>
+  </section>
+  <section class="panel" id="tab-build" hidden>
+    <h2>建設</h2>
+    <div id="builds"></div>
+  </section>
+  <section class="panel" id="tab-log" hidden>
+    <h2>開拓日誌</h2>
+    <div class="stats" id="stats"></div>
+    <ul class="log" id="log"></ul>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist" aria-label="画面切り替え">
+  <div>
+    <button role="tab" aria-selected="true" data-tab="work">仕事</button>
+    <button role="tab" aria-selected="false" data-tab="build">建設<i class="dot" id="buildDot" hidden></i></button>
+    <button role="tab" aria-selected="false" data-tab="log">日誌</button>
+  </div>
+</nav>
+
+<div class="veil" id="away" hidden>
+  <div class="card" role="dialog" aria-labelledby="awayT">
+    <h3 id="awayT">留守のあいだに</h3>
+    <dl id="awayDl"></dl>
+    <button class="ok" id="awayOk">集落に戻る</button>
+  </div>
+</div>
+
+<script>
+// ===== core: pure colony logic (no DOM) =====
+const DAY = 90; // real seconds per in-game day
+const JOBS = {
+  gather: { name: '採集', desc: '食料を集める' },
+  wood:   { name: '伐採', desc: '木を切り出す' },
+  stone:  { name: '採石', desc: '石を掘り出す' },
+  guard:  { name: '見張り', desc: '盗賊から集落を守る' },
+  smith:  { name: '鍛冶', desc: '鉄を打つ（鍛冶場が必要）' },
+};
+const RES = ['food', 'wood', 'stone', 'iron'];
+const RES_NAME = { food: '食料', wood: '木材', stone: '石', iron: '鉄' };
+const BUILD = {
+  hut:    { name: '小屋', desc: '住める人数 +2', cost: lv => ({ wood: 15 * 1.35 ** lv }) },
+  farm:   { name: '畑', desc: '採集の量 ×1.25', cost: lv => ({ wood: 20 * 1.45 ** lv, stone: lv ? 6 * 1.45 ** lv : 0 }) },
+  mill:   { name: '製材台', desc: '伐採の量 ×1.25', cost: lv => ({ wood: 25 * 1.5 ** lv, stone: 10 * 1.5 ** lv }) },
+  quarry: { name: '石切り場', desc: '採石の量 ×1.25', cost: lv => ({ wood: 30 * 1.5 ** lv }) },
+  store:  { name: '倉庫', desc: '資源の上限 ×1.6', cost: lv => ({ wood: 30 * 1.55 ** lv, stone: 20 * 1.55 ** lv }) },
+  wall:   { name: '防壁', desc: '守りが上がる', cost: lv => ({ stone: 30 * 1.6 ** lv, wood: 10 * 1.6 ** lv }) },
+  tower:  { name: '見張り台', desc: '見張りの力 ×1.15', cost: lv => ({ wood: 40 * 1.6 ** lv, stone: 25 * 1.6 ** lv }) },
+  forge:  { name: '鍛冶場', desc: '鍛冶が働ける・鉄 ×1.25', cost: lv => ({ stone: 50 * 1.7 ** lv, wood: 40 * 1.7 ** lv }) },
+  arms:   { name: '武器を鍛える', desc: '見張りの力 ×1.2', cost: lv => ({ iron: 8 * 1.6 ** lv }), needs: 'forge' },
+};
+
+function newColony() {
+  return { v: 1, t: Date.now(), time: 0,
+    res: { food: 30, wood: 25, stone: 0, iron: 0 },
+    pop: 3, jobs: { gather: 2, wood: 1, stone: 0, guard: 0, smith: 0 },
+    b: { hut: 0, farm: 0, mill: 0, quarry: 0, store: 0, wall: 0, tower: 0, forge: 0, arms: 0 },
+    nextRaid: DAY * 2.8, raids: 0, won: 0, lost: 0, dead: 0, joined: 0,
+    arriveT: 0, starveT: 0, log: [] };
+}
+const dayOf = s => Math.floor(s.time / DAY) + 1;
+const isNight = s => (s.time % DAY) / DAY > 0.62;
+const popCap = s => 4 + 2 * s.b.hut;
+const resCap = (s, r) => (r === 'iron' ? 40 : 120) * 1.6 ** s.b.store;
+const working = s => Object.values(s.jobs).reduce((a, b) => a + b, 0);
+const idle = s => s.pop - working(s);
+
+function rates(s) {
+  const j = s.jobs, b = s.b;
+  return {
+    food: j.gather * 0.5 * 1.25 ** b.farm - s.pop * 0.25,
+    wood: j.wood * 0.4 * 1.25 ** b.mill,
+    stone: j.stone * 0.3 * 1.25 ** b.quarry,
+    iron: b.forge ? j.smith * 0.12 * 1.25 ** (b.forge - 1) : 0,
+  };
+}
+const guardPower = s => 3 * 1.15 ** s.b.tower * 1.2 ** s.b.arms;
+const wallDef = s => (s.b.wall ? 8 * s.b.wall ** 1.4 : 0);
+const defense = s => s.jobs.guard * guardPower(s) + wallDef(s) + s.pop * 0.5;
+const raidPower = n => Math.round(4 * 1.16 ** n + 2 * n);
+const raidGap = n => (n < 10 ? 3 : 2) * DAY;
+
+function costOf(s, k) {
+  const c = BUILD[k].cost(s.b[k]), out = {};
+  for (const r in c) if (c[r] > 0) out[r] = Math.ceil(c[r]);
+  return out;
+}
+function canAfford(s, c) { for (const r in c) if (s.res[r] < c[r]) return false; return true; }
+function fitsCap(s, c) { for (const r in c) if (c[r] > resCap(s, r)) return false; return true; }
+function locked(s, k) { const n = BUILD[k].needs; return n && !s.b[n]; }
+function build(s, k) {
+  if (locked(s, k)) return false;
+  const c = costOf(s, k);
+  if (!canAfford(s, c)) return false;
+  for (const r in c) s.res[r] -= c[r];
+  s.b[k]++;
+  return true;
+}
+function setJob(s, k, d) {
+  if (d > 0 && idle(s) <= 0) return false;
+  if (d < 0 && s.jobs[k] <= 0) return false;
+  if (k === 'smith' && d > 0 && !s.b.forge) return false;
+  s.jobs[k] += d;
+  return true;
+}
+function pushLog(s, text, kind, quiet) {
+  if (quiet) return;
+  s.log.unshift({ d: dayOf(s), text, kind });
+  if (s.log.length > 40) s.log.length = 40;
+}
+// where a newcomer should go
+function autoAssign(s) {
+  const r = rates(s);
+  let k;
+  if (r.food < 0.4) k = 'gather';
+  else if (defense(s) < raidPower(s.raids) * 1.15) k = 'guard';
+  else {
+    const opts = ['wood', 'stone'].concat(s.b.forge ? ['smith'] : []);
+    k = opts.reduce((a, b) => (s.jobs[b] < s.jobs[a] ? b : a));
+  }
+  s.jobs[k]++;
+  return k;
+}
+function removePerson(s, prefer) {
+  s.pop--;
+  if (idle(s) >= 0) return;
+  const order = [prefer, 'smith', 'stone', 'wood', 'guard', 'gather'];
+  for (const k of order) if (k && s.jobs[k] > 0) { s.jobs[k]--; return; }
+}
+function resolveRaid(s, quiet, sum) {
+  const p = raidPower(s.raids), d = defense(s);
+  s.nextRaid += raidGap(s.raids);
+  let ev;
+  if (d >= p) {
+    s.raids++; // the bandits only grow bolder after being driven off
+    const food = Math.round(8 + p * 0.8), iron = Math.floor(p / 6);
+    s.res.food = Math.min(resCap(s, 'food'), s.res.food + food);
+    s.res.iron = Math.min(resCap(s, 'iron'), s.res.iron + iron);
+    s.won++;
+    pushLog(s, `盗賊団（戦力${p}）を撃退した。食料 +${food}${iron ? `・鉄 +${iron}` : ''}`, 'win', quiet);
+    ev = { type: 'raid', win: true, p, d };
+  } else {
+    for (const r of RES) s.res[r] *= 0.7;
+    let died = false;
+    if (p > d * 1.5 && s.pop > 1 && s.won + s.lost >= 2) { removePerson(s, 'guard'); s.dead++; died = true; }
+    s.lost++;
+    pushLog(s, `盗賊団（戦力${p}）に押し入られた。蓄えの3割を奪われた${died ? '。住人がひとり倒れた' : ''}`, 'lose', quiet);
+    ev = { type: 'raid', win: false, p, d, died };
+  }
+  if (sum) { sum.raids++; if (ev.win) sum.won++; else sum.lost++; if (ev.died) sum.dead++; }
+  return ev;
+}
+// advance dt seconds (dt <= 1)
+function step(s, dt, quiet, sum) {
+  const events = [];
+  const before = dayOf(s);
+  s.time += dt;
+  const r = rates(s);
+  for (const k of RES) {
+    const was = s.res[k];
+    s.res[k] = Math.max(0, Math.min(resCap(s, k), was + r[k] * dt));
+    if (sum && k !== 'food') sum[k] += Math.max(0, s.res[k] - was);
+  }
+  // newcomers
+  s.arriveT += dt;
+  if (s.arriveT >= 40) {
+    s.arriveT = 0;
+    if (s.pop < popCap(s) && s.res.food >= 15 && r.food >= 0) {
+      s.pop++; s.joined++;
+      const k = autoAssign(s);
+      pushLog(s, `流れ者がひとり加わり、${JOBS[k].name}についた`, 'join', quiet);
+      if (sum) sum.joined++;
+      events.push({ type: 'join' });
+    }
+  }
+  // hunger
+  if (s.res.food <= 0 && r.food < 0) {
+    s.starveT += dt;
+    if (s.starveT >= 25 && s.pop > 1) {
+      s.starveT = 0;
+      removePerson(s, null);
+      pushLog(s, '食料が尽き、住人がひとり集落を去った', 'lose', quiet);
+      if (sum) sum.left++;
+    }
+  } else s.starveT = 0;
+  if (s.time >= s.nextRaid) events.push(resolveRaid(s, quiet, sum));
+  if (dayOf(s) !== before) events.push({ type: 'day' });
+  return events;
+}
+function simulate(s, sec) {
+  const sum = { sec, raids: 0, won: 0, lost: 0, dead: 0, joined: 0, left: 0, wood: 0, stone: 0, iron: 0, day0: dayOf(s) };
+  const n = Math.min(Math.floor(sec), 12 * 3600);
+  for (let i = 0; i < n; i++) step(s, 1, true, sum);
+  sum.day1 = dayOf(s);
+  return sum;
+}
+// ===== ui =====
+const KEY = 'hai-no-kaitakuchi-v1';
+let S = null, curTab = 'work';
+const $ = id => document.getElementById(id);
+
+function fmt(n) {
+  n = Math.floor(Math.max(0, n));
+  if (n < 10000) return n.toLocaleString('ja-JP');
+  for (const [u, nm] of [[1e16, '京'], [1e12, '兆'], [1e8, '億'], [1e4, '万']]) {
+    if (n >= u) { const v = n / u; return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + nm; }
+  }
+}
+function fmtRate(r) {
+  const a = Math.abs(r);
+  const t = a >= 100 ? fmt(a) : a >= 10 ? a.toFixed(1) : a.toFixed(2);
+  return (r < 0 ? '−' : '+') + t + '/秒';
+}
+function clockText(s) {
+  const frac = (s.time % DAY) / DAY;
+  const hour = Math.floor((6 + frac * 24) % 24);
+  return `${dayOf(s)}日目 ${hour}時`;
+}
+function untilText(sec) {
+  const h = Math.max(0, Math.round(sec / DAY * 24));
+  const d = Math.floor(h / 24), r = h % 24;
+  if (d && r) return `${d}日と${r}時間`;
+  if (d) return `${d}日`;
+  return `${Math.max(1, r)}時間`;
+}
+
+// ---- save ----
+function save() {
+  if (!S) return;
+  S.t = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1) return null;
+    const base = newColony();
+    s.b = Object.assign(base.b, s.b || {});
+    s.jobs = Object.assign(base.jobs, s.jobs || {});
+    s.res = Object.assign(base.res, s.res || {});
+    return s;
+  } catch (e) { return null; }
+}
+
+// ================= scene =================
+const PAL = { g: '#5e8a3a', G: '#3f6428', b: '#6a4426', s: '#a6a29a', S: '#76716a', r: '#b0603a', R: '#7e3e24', k: '#2a1e16',
+  w: '#c8a070', W: '#a07c50', o: '#f08a2a', O: '#ffd060', l: '#8a6a44', c: '#e0cfa0' };
+const SPR = {
+  tree: ["...g...", "..ggg..", ".ggGgg.", "..gGg..", ".gggGg.", "ggGgggG", "..GgG..", "...b...", "...b..."],
+  rock: ["..sss..", ".sSsss.", "ssssSss", "sSssssS", ".SSSSS."],
+  tent: ["....R....", "...rrr...", "..rrRrr..", ".rrrkrrr.", "rrrrkrrrr", "RRRRkRRRR"],
+  hut: [".....R.....", "....RRR....", "...RRRRR...", "..RRRRRRR..", ".RRRRRRRRR.", "..wwwwwww..", "..wwkkwOw..", "..wwkkwww..", "..WWkkWWW.."],
+  store: ["......R......", "....RRRRR....", "..RRRRRRRRR..", "RRRRRRRRRRRRR", ".WwwwwwwwwwW.", ".WwwkkkkkwwW.", ".WwwkkWkkwwW.", ".WwwkkWkkwwW.", ".WWWWWWWWWWW."],
+  forge: [".......kk..", ".......SS..", ".sssssssSs.", "sSssssssssS", "ssSsssssSss", "sssskkksssS", "ssskoOoksss", "sSskoookSss", "SSSSSSSSSSS"],
+  tower: [".RRRRR.", "RRRRRRR", ".lllll.", ".l.k.l.", ".lllll.", "..l.l..", "..l.l..", "..lll..", "..l.l..", "..l.l..", "..lll..", "..l.l..", ".ll.ll."],
+  logs: ["...bbb...", "..bcbcb..", ".bcbcbcb.", "bcbcbcbcb", "bbbbbbbbb"],
+  fire1: ["..o..", ".oOo.", ".oOo.", "bbObb", ".b.b."],
+  fire2: ["..O..", ".oO..", "oOOo.", "bbobb", ".b.b."],
+  fire3: [".o...", "..oO.", ".oOOo", "bbObb", ".b.b."],
+};
+function blit(ctx, rows, x, y) {
+  for (let j = 0; j < rows.length; j++) {
+    const r = rows[j];
+    for (let i = 0; i < r.length; i++) {
+      const c = r[i];
+      if (c === '.') continue;
+      ctx.fillStyle = PAL[c];
+      ctx.fillRect(x + i, y + j, 1, 1);
+    }
+  }
+}
+const TREES = [[120, 2], [131, 6], [142, 1], [151, 8], [125, 14], [137, 18], [148, 21], [117, 26], [130, 28], [143, 33], [153, 32], [122, 38]];
+const ROCKS = [[124, 86], [134, 92], [146, 87], [119, 98], [138, 101], [151, 98], [128, 78]];
+const HUTS = [[58, 34], [70, 34], [90, 34], [101, 34], [58, 48], [101, 48], [58, 64], [101, 64], [58, 80], [70, 80], [90, 80], [101, 80]];
+const PLOTS = [];
+for (let y = 0; y < 7; y++) for (let x = 0; x < 2; x++) PLOTS.push([7 + x * 21, 22 + y * 11]);
+const FIRE = [82, 58];
+const WALL = { x0: 54, y0: 30, x1: 114, y1: 96, gate0: 80, gate1: 89 };
+const JOB_COLOR = { gather: '#7fb03a', wood: '#a0602a', stone: '#4e5866', guard: '#c0392b', smith: '#2f6a8e', idle: '#ece4d2' };
+
+let ground = null;
+function makeGround() {
+  ground = document.createElement('canvas');
+  ground.width = 160; ground.height = 110;
+  const g = ground.getContext('2d');
+  g.fillStyle = '#c9a46a'; g.fillRect(0, 0, 160, 110);
+  let seed = 7;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 900; i++) {
+    const v = rand();
+    g.fillStyle = v < 0.45 ? '#bc955c' : v < 0.9 ? '#d6b47c' : '#9a9a50';
+    g.fillRect(Math.floor(rand() * 160), Math.floor(rand() * 110), 1, 1);
+  }
+  // worn path from the gate to the fire
+  g.fillStyle = '#d9bd88';
+  for (let y = 0; y < 60; y++) g.fillRect(83 + Math.round(Math.sin(y / 6)), y, 3, 1);
+}
+
+// people
+let people = [];
+function areaPoint(job) {
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  switch (job) {
+    case 'gather': {
+      const n = Math.min(PLOTS.length, 1 + S.b.farm), p = PLOTS[Math.floor(Math.random() * n)];
+      return [p[0] + rnd(1, 8), p[1] + rnd(0, 4)];
+    }
+    case 'wood': return [rnd(116, 152), rnd(40, 50)];
+    case 'stone': return [rnd(120, 154), rnd(82, 102)];
+    case 'guard': {
+      if (S.b.wall) {
+        const side = Math.random();
+        if (side < 0.5) return [rnd(WALL.x0, WALL.x1), WALL.y0 - 5];
+        return side < 0.75 ? [WALL.x0 - 4, rnd(WALL.y0, WALL.y1 - 6)] : [WALL.x1 + 2, rnd(WALL.y0, WALL.y1 - 6)];
+      }
+      return [rnd(70, 100), rnd(22, 30)];
+    }
+    case 'smith': return S.b.forge ? [rnd(114, 126), rnd(68, 72)] : [rnd(76, 92), rnd(64, 70)];
+    default: return [rnd(72, 94), rnd(52, 70)];
+  }
+}
+function syncPeople(fromGate) {
+  const want = Object.assign({}, S.jobs, { idle: Math.max(0, idle(S)) });
+  for (const job in want) {
+    const have = people.filter(p => p.job === job);
+    for (let i = have.length; i < want[job]; i++) {
+      const [x, y] = fromGate ? [84, -4] : areaPoint(job);
+      const t = areaPoint(job);
+      people.push({ job, x, y, tx: t[0], ty: t[1], wait: Math.random() * 2, ph: Math.random() * 6 });
+    }
+    for (let i = want[job]; i < have.length; i++) people.splice(people.indexOf(have[i]), 1);
+  }
+}
+function movePeople(dt) {
+  for (const p of people) {
+    if (p.wait > 0) { p.wait -= dt; continue; }
+    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+    if (d < 0.6) {
+      p.wait = 1 + Math.random() * 3;
+      const t = areaPoint(p.job); p.tx = t[0]; p.ty = t[1];
+      continue;
+    }
+    const v = Math.min(d, 11 * dt);
+    p.x += dx / d * v; p.y += dy / d * v; p.ph += dt * 8;
+  }
+}
+function drawPerson(ctx, x, y, shirt, head, walking, ph) {
+  x = Math.round(x); y = Math.round(y);
+  ctx.fillStyle = head; ctx.fillRect(x + 1, y, 1, 1);
+  ctx.fillStyle = shirt; ctx.fillRect(x, y + 1, 3, 2);
+  ctx.fillStyle = '#3a2a1e';
+  const step = walking && Math.floor(ph) % 2;
+  ctx.fillRect(x, y + 3, 1, step ? 1 : 2);
+  ctx.fillRect(x + 2, y + 3, 1, step ? 2 : 1);
+}
+
+// raid animation
+let raid = null, bannerT = 0;
+function startRaid(ev) {
+  const n = Math.max(3, Math.min(10, 2 + Math.round(Math.log2(ev.p + 1))));
+  raid = { ev, t: 0, men: [] };
+  for (let i = 0; i < n; i++) raid.men.push({ x: 40 + Math.random() * 90, y: -8 - Math.random() * 10, ph: Math.random() * 6 });
+  const b = $('banner');
+  b.textContent = ev.win ? '盗賊を撃退した！' : '略奪された…';
+  b.className = 'banner ' + (ev.win ? 'win' : 'lose');
+  bannerT = 0;
+}
+function updateRaid(dt) {
+  if (!raid) return;
+  raid.t += dt;
+  const t = raid.t;
+  for (const m of raid.men) {
+    let tx, ty;
+    if (t < 2.2) { tx = 84 + (m.x - 84) * 0.3; ty = WALL.y0 - 8; }
+    else if (raid.ev.win) { tx = m.x; ty = -14; }
+    else if (t < 4) { tx = FIRE[0] + (m.x - 84) * 0.15; ty = FIRE[1]; }
+    else { tx = m.x; ty = -14; }
+    const dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy);
+    const v = Math.min(d, (raid.ev.win && t >= 2.2 ? 26 : 20) * dt);
+    if (d > 0.5) { m.x += dx / d * v; m.y += dy / d * v; m.ph += dt * 10; }
+  }
+  if (t > 2.2 && $('banner').hidden && bannerT === 0) { $('banner').hidden = false; bannerT = 0.001; }
+  if (bannerT) { bannerT += dt; if (bannerT > 2.4) { $('banner').hidden = true; } }
+  if (t > 6) { raid = null; bannerT = 0; $('banner').hidden = true; }
+}
+function darkness(s) {
+  const f = (s.time % DAY) / DAY;
+  if (f < 0.55) return 0;
+  if (f < 0.65) return (f - 0.55) / 0.1;
+  if (f < 0.94) return 1;
+  return (1 - f) / 0.06;
+}
+function drawScene(now) {
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(ground, 0, 0);
+  const b = S.b;
+  // fields
+  const nPlots = Math.min(PLOTS.length, 1 + b.farm);
+  for (let i = 0; i < nPlots; i++) {
+    const [x, y] = PLOTS[i];
+    ctx.fillStyle = '#7a5a36'; ctx.fillRect(x, y, 18, 8);
+    ctx.fillStyle = i === 0 && !b.farm ? '#8a9a4a' : '#5e8a3a';
+    for (let r = 1; r < 8; r += 2) for (let c = 1; c < 18; c += 2) ctx.fillRect(x + c, y + r, 1, 1);
+  }
+  // nature
+  for (const [x, y] of ROCKS) blit(ctx, SPR.rock, x, y);
+  for (let i = 0; i < Math.min(6, b.quarry); i++) { ctx.fillStyle = i % 2 ? '#a6a29a' : '#8e8a82'; ctx.fillRect(118 + i * 4, 74, 3, 2); }
+  for (const [x, y] of TREES) blit(ctx, SPR.tree, x, y);
+  if (b.mill) blit(ctx, SPR.logs, 117, 50);
+  if (b.mill > 3) blit(ctx, SPR.logs, 127, 51);
+  if (b.forge) blit(ctx, SPR.forge, 115, 60);
+  if (b.store) blit(ctx, SPR.store, 32, 99);
+  if (b.store > 4) blit(ctx, SPR.store, 6, 99);
+  // wall
+  if (b.wall) {
+    const th = b.wall >= 12 ? 3 : b.wall >= 5 ? 2 : 1;
+    ctx.fillStyle = b.wall >= 8 ? '#8e8a82' : '#a07c50';
+    const { x0, y0, x1, y1, gate0, gate1 } = WALL;
+    ctx.fillRect(x0, y0, gate0 - x0, th); ctx.fillRect(gate1, y0, x1 - gate1, th);
+    ctx.fillRect(x0, y1 - th, x1 - x0, th);
+    ctx.fillRect(x0, y0, th, y1 - y0); ctx.fillRect(x1 - th, y0, th, y1 - y0);
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    for (let x = x0; x < x1; x += 4) { if (x < gate0 || x >= gate1) ctx.fillRect(x, y0 + th, 2, 1); }
+  }
+  const corners = [[WALL.x0 - 3, WALL.y0 - 11], [WALL.x1 - 4, WALL.y0 - 11], [WALL.x0 - 3, WALL.y1 - 12], [WALL.x1 - 4, WALL.y1 - 12]];
+  // huts (tent + huts), people and towers sorted roughly by y
+  const sprites = [];
+  sprites.push({ y: 52, f: () => blit(ctx, SPR.tent, 70, 46) });
+  for (let i = 0; i < Math.min(HUTS.length, b.hut); i++) { const [x, y] = HUTS[i]; sprites.push({ y: y + 9, f: () => blit(ctx, SPR.hut, x, y) }); }
+  for (let i = 0; i < Math.min(4, b.tower); i++) { const [x, y] = corners[i]; sprites.push({ y: y + 13, f: () => blit(ctx, SPR.tower, x, y) }); }
+  const frame = Math.floor(now / 140) % 3;
+  sprites.push({ y: FIRE[1] + 5, f: () => blit(ctx, [SPR.fire1, SPR.fire2, SPR.fire3][frame], FIRE[0], FIRE[1]) });
+  for (const p of people) sprites.push({ y: p.y + 5, f: () => drawPerson(ctx, p.x, p.y, JOB_COLOR[p.job], '#f0c090', p.wait <= 0, p.ph) });
+  if (raid) for (const m of raid.men) sprites.push({ y: m.y + 5, f: () => drawPerson(ctx, m.x, m.y, '#3a1a1a', '#6a2a2a', true, m.ph) });
+  sprites.sort((a, c) => a.y - c.y).forEach(s => s.f());
+  // night
+  const dk = darkness(S);
+  if (dk > 0) {
+    ctx.fillStyle = `rgba(16,20,50,${0.55 * dk})`;
+    ctx.fillRect(0, 0, 160, 110);
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = (x, y, r, a) => {
+      const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, `rgba(255,140,50,${a * dk})`); gr.addColorStop(1, 'rgba(255,140,50,0)');
+      ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    };
+    glow(FIRE[0] + 2, FIRE[1] + 2, 26 + (frame - 1) * 1.5, 0.32);
+    if (b.forge) glow(120, 67, 12, 0.3);
+    for (let i = 0; i < Math.min(HUTS.length, b.hut); i++) glow(HUTS[i][0] + 7, HUTS[i][1] + 6, 4, 0.35);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+// ================= panels =================
+function buildRows() {
+  const jb = $('jobs'); jb.innerHTML = '';
+  for (const k of Object.keys(JOBS)) {
+    const r = document.createElement('div');
+    r.className = 'row'; r.id = 'jr-' + k;
+    r.innerHTML = `<div class="t"><strong><i class="dot" style="background:${JOB_COLOR[k]}"></i>${JOBS[k].name}</strong><p id="jd-${k}"></p></div>
+      <div class="stepper"><button id="jm-${k}" aria-label="${JOBS[k].name}を減らす">−</button><span id="jn-${k}">0</span><button id="jp-${k}" aria-label="${JOBS[k].name}を増やす">＋</button></div>`;
+    jb.appendChild(r);
+    r.querySelector('#jm-' + k).addEventListener('click', () => { if (setJob(S, k, -1)) { syncPeople(); renderUI(); } });
+    r.querySelector('#jp-' + k).addEventListener('click', () => { if (setJob(S, k, 1)) { syncPeople(); renderUI(); } });
+  }
+  const bb = $('builds'); bb.innerHTML = '';
+  for (const k of Object.keys(BUILD)) {
+    const r = document.createElement('div');
+    r.className = 'row'; r.id = 'br-' + k;
+    r.innerHTML = `<div class="t"><strong>${BUILD[k].name}</strong><span class="lv" id="bl-${k}"></span><p>${BUILD[k].desc}</p><div class="costs" id="bc-${k}"></div></div>
+      <button class="mk" id="bb-${k}">建てる</button>`;
+    bb.appendChild(r);
+    r.querySelector('button').addEventListener('click', () => { if (build(S, k)) { save(); renderUI(); } });
+  }
+}
+const PER = { gather: s => 0.5 * 1.25 ** s.b.farm, wood: s => 0.4 * 1.25 ** s.b.mill, stone: s => 0.3 * 1.25 ** s.b.quarry,
+  smith: s => (s.b.forge ? 0.12 * 1.25 ** (s.b.forge - 1) : 0) };
+function renderUI() {
+  const s = S, r = rates(s);
+  $('when').textContent = clockText(s);
+  $('pop').textContent = `${s.pop} / ${popCap(s)}`;
+  // resources
+  $('res').innerHTML = RES.map(k => {
+    const cap = resCap(s, k);
+    return `<div class="r-${k}"><small>${RES_NAME[k]}</small><b>${fmt(s.res[k])}</b><i class="${r[k] < 0 ? 'neg' : ''}">${fmtRate(r[k])}</i><div class="cap"><span style="width:${Math.min(100, s.res[k] / cap * 100)}%"></span></div></div>`;
+  }).join('');
+  // raid watch
+  const p = raidPower(s.raids), d = defense(s);
+  $('raidWhen').textContent = `次の襲撃まで あと${untilText(s.nextRaid - s.time)}`;
+  const chip = $('raidChip');
+  chip.textContent = d >= p ? '守れる' : '危険';
+  chip.className = 'chip ' + (d >= p ? 'safe' : 'danger');
+  const scale = Math.max(d, p) * 1.15 || 1;
+  $('vsD').style.width = (d / scale * 100) + '%';
+  $('vsD').style.background = d >= p ? 'var(--safe)' : 'var(--danger)';
+  $('vsP').style.left = (p / scale * 100) + '%';
+  $('defv').textContent = fmt(d);
+  $('powv').textContent = fmt(p);
+  // jobs
+  const free = idle(s);
+  $('idleHint').textContent = free > 0 ? `手の空いた住人が${free}人います。＋で仕事を任せましょう。` : '全員が働いています。住人は小屋を建てると増えます。';
+  for (const k of Object.keys(JOBS)) {
+    const off = k === 'smith' && !s.b.forge;
+    $('jr-' + k).classList.toggle('off', off);
+    $('jn-' + k).textContent = s.jobs[k];
+    $('jm-' + k).disabled = s.jobs[k] <= 0;
+    $('jp-' + k).disabled = free <= 0 || off;
+    let desc = JOBS[k].desc;
+    if (k === 'guard') desc += `（1人 守り${fmt(guardPower(s))}）`;
+    else if (!off) desc += `（1人 ${PER[k](s).toFixed(2)}/秒）`;
+    $('jd-' + k).textContent = desc;
+  }
+  // builds
+  let canBuild = false;
+  for (const k of Object.keys(BUILD)) {
+    const lk = locked(s, k);
+    $('br-' + k).classList.toggle('off', !!lk);
+    $('bl-' + k).textContent = 'Lv' + s.b[k];
+    const c = costOf(s, k), fits = fitsCap(s, c);
+    $('bc-' + k).innerHTML = lk ? '<span class="short">鍛冶場が必要</span>'
+      : Object.keys(c).map(rk => `<span class="${s.res[rk] < c[rk] ? 'short' : ''}">${RES_NAME[rk]} ${fmt(c[rk])}</span>`).join('') + (fits ? '' : '<span class="short">倉庫が手狭</span>');
+    const ok = !lk && canAfford(s, c);
+    $('bb-' + k).disabled = !ok;
+    if (ok) canBuild = true;
+  }
+  $('buildDot').hidden = !canBuild || curTab === 'build';
+  // log
+  $('stats').innerHTML = `<span>撃退<b>${s.won}</b></span><span>略奪<b>${s.lost}</b></span><span>加わった住人<b>${s.joined}</b></span><span>倒れた住人<b>${s.dead}</b></span>`;
+  $('log').innerHTML = s.log.slice(0, 25).map(l => `<li class="${l.kind}"><span class="d">${l.d}日目</span>${l.text}</li>`).join('');
+}
+function setTab(t) {
+  curTab = t;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $('tab-work').hidden = t !== 'work';
+  $('tab-build').hidden = t !== 'build';
+  $('tab-log').hidden = t !== 'log';
+  renderUI();
+}
+
+// ---- away ----
+function catchUp(ms) {
+  const sec = ms / 1000;
+  const sum = simulate(S, sec);
+  const rows = [['留守の時間', `${Math.floor(sec / 3600)}時間${Math.floor(sec % 3600 / 60)}分${sec > 43200 ? '（上限）' : ''}`],
+    ['過ぎた日数', `${sum.day0}日目 → ${sum.day1}日目`]];
+  if (sum.raids) rows.push(['盗賊の襲撃', `撃退 ${sum.won} ／ 略奪 ${sum.lost}`]);
+  if (sum.joined) rows.push(['加わった住人', `${sum.joined}人`]);
+  if (sum.dead + sum.left) rows.push(['失った住人', `${sum.dead + sum.left}人`]);
+  rows.push(['集めた木材・石', `${fmt(sum.wood)} ・ ${fmt(sum.stone)}`]);
+  if (sum.iron) rows.push(['打った鉄', fmt(sum.iron)]);
+  $('awayDl').innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('away').hidden = false;
+  people = []; syncPeople();
+  save();
+}
+
+// ---- loop ----
+let last = performance.now(), acc = 0, lastWall = Date.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const wall = Date.now(), gap = wall - lastWall;
+  lastWall = wall;
+  if (gap > 20000) { catchUp(gap); renderUI(); }
+  else {
+    acc += Math.min(gap, 2000) / 1000;
+    let changed = false;
+    while (acc >= 1) {
+      acc -= 1;
+      for (const ev of step(S, 1, false, null)) {
+        if (ev.type === 'raid') { startRaid(ev); syncPeople(); }
+        if (ev.type === 'join') syncPeople(true);
+      }
+      changed = true;
+    }
+    if (changed) { syncPeople(); renderUI(); }
+  }
+  movePeople(dt);
+  updateRaid(dt);
+  drawScene(now);
+  requestAnimationFrame(frame);
+}
+
+let started = false;
+function start(data) {
+  if (started) return;
+  started = true;
+  S = (data && data.state) || load();
+  let away = 0;
+  if (!S) {
+    S = newColony();
+    pushLog(S, '3人の開拓者が荒野に降り立った。3日目の夜に盗賊が来るらしい', 'join', false);
+  } else if (!(data && data.state)) away = Date.now() - (S.t || Date.now());
+  makeGround();
+  buildRows();
+  syncPeople();
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  $('awayOk').addEventListener('click', () => { $('away').hidden = true; });
+  if (away > 60000) catchUp(away);
+  renderUI();
+  lastWall = Date.now();
+  requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+  setInterval(save, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+  try { if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') window.claude.hot.snapshot(() => ({ state: S })); } catch (e) {}
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
